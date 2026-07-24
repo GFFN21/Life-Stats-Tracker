@@ -1,0 +1,1454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Mood & Habit Tracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #f4fbf4;
+            --card-bg: #ffffff;
+            --primary-green: #2e8b57;
+            --primary-hover: #246e45;
+            --light-green: #d1e7dd;
+            --text-main: #333333;
+            --text-muted: #666666;
+            --danger-red: #e74c3c;
+            --border-color: #d1e7dd;
+        }
+
+        /* Themes */
+        body.theme-green { --primary-green: #2e8b57; --primary-hover: #246e45; --light-green: #d1e7dd; --bg-color: #f4fbf4; --card-bg: #ffffff; --text-main: #333333; --text-muted: #666666; --border-color: #d1e7dd; }
+        body.theme-blue { --primary-green: #2563eb; --primary-hover: #1d4ed8; --light-green: #dbeafe; --bg-color: #f8fafc; --card-bg: #ffffff; --text-main: #1e293b; --text-muted: #64748b; --border-color: #dbeafe; }
+        body.theme-amber { --primary-green: #d97706; --primary-hover: #b45309; --light-green: #fef3c7; --bg-color: #fffbeb; --card-bg: #ffffff; --text-main: #451a03; --text-muted: #78350f; --border-color: #fef3c7; }
+        body.theme-dark { --primary-green: #10b981; --primary-hover: #059669; --light-green: #064e3b; --bg-color: #111827; --card-bg: #1f2937; --text-main: #f9fafb; --text-muted: #9ca3af; --border-color: #374151; }
+
+        /* Font Sizes */
+        body.font-small { font-size: 13px; }
+        body.font-medium { font-size: 15px; }
+        body.font-large { font-size: 17px; }
+        body.font-xl { font-size: 19px; }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-main); display: flex; justify-content: center; padding: 0; margin: 0; height: 100vh; transition: background-color 0.2s, color 0.2s; }
+        .app-container { max-width: 500px; width: 100%; height: 100%; display: flex; flex-direction: column; background-color: var(--bg-color); position: relative; }
+        
+        nav { display: flex; align-items: center; justify-content: center; padding: 1.5rem 1rem; background-color: var(--card-bg); border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 10; }
+        nav h1 { color: var(--primary-green); font-size: 1.5rem; margin: 0; }
+        #back-btn { position: absolute; left: 1rem; background: none; border: none; color: var(--primary-green); font-size: 1rem; font-weight: bold; cursor: pointer; display: none; padding: 0.5rem; }
+        
+        .view-container { padding: 1.5rem 1rem; overflow-y: auto; flex-grow: 1; }
+        .view { display: none; }
+        .view.active { display: block; }
+        
+        .menu-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+        .menu-card { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.25rem; display: flex; align-items: center; cursor: pointer; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); transition: transform 0.1s; }
+        .menu-card:active, .menu-card:hover { transform: scale(0.98); border-color: var(--primary-green); }
+        .menu-icon { font-size: 1.8rem; margin-right: 1.25rem; }
+        .menu-text h2 { font-size: 1.1rem; color: var(--primary-green); margin-bottom: 0.2rem; }
+        .menu-text p { font-size: 0.85rem; color: var(--text-muted); }
+        
+        .card { background-color: var(--card-bg); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); border: 1px solid var(--border-color); }
+        .card h2 { font-size: 1.1rem; margin-bottom: 0; color: var(--primary-green); display: flex; justify-content: space-between; align-items: center; }
+
+        .card details summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+        .card details summary::-webkit-details-marker { display: none; }
+        .card details summary::after { content: '▼'; font-size: 0.8rem; color: var(--primary-green); transition: transform 0.2s; margin-left: 10px; }
+        .card details[open] summary::after { transform: rotate(180deg); }
+        .card details .collapsible-content { margin-top: 1.25rem; }
+        
+        /* Form Inputs */
+        .slider-group { margin-bottom: 1.5rem; }
+        .slider-group:last-child { margin-bottom: 0; }
+        .slider-label-wrapper { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.95rem; }
+        .slider-value { color: var(--primary-green); font-weight: bold; }
+        input[type="range"] { width: 100%; height: 8px; background: var(--border-color); border-radius: 4px; outline: none; appearance: none; }
+        input[type="range"]::-webkit-slider-thumb { appearance: none; width: 22px; height: 22px; border-radius: 50%; background: var(--primary-green); cursor: pointer; }
+        
+        textarea, input[type="text"], input[type="number"], input[type="date"], select { width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.95rem; outline: none; transition: border-color 0.2s; background-color: var(--card-bg); color: var(--text-main); }
+        textarea { resize: vertical; min-height: 60px; }
+        textarea:focus, input[type="text"]:focus, input[type="number"]:focus, input[type="date"]:focus, select:focus { border-color: var(--primary-green); }
+        
+        button.btn-main { width: 100%; background-color: var(--primary-green); color: white; border: none; padding: 1rem; font-size: 1.1rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 0.5rem; }
+        button.btn-main:hover { background-color: var(--primary-hover); }
+        #success-message, #event-success-message { display: none; background-color: var(--light-green); color: var(--primary-green); text-align: center; padding: 1rem; border-radius: 8px; margin-top: 1rem; font-weight: bold; }
+        
+        /* CSS Toggle Switch */
+        .switch { position: relative; display: inline-block; width: 46px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider-switch { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 24px; }
+        .slider-switch:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider-switch { background-color: var(--primary-green); }
+        input:checked + .slider-switch:before { transform: translateX(22px); }
+        .binary-text { font-size: 0.85rem; font-weight: bold; margin-left: 10px; min-width: 30px; display: inline-block; }
+
+        /* Color Palette Grid */
+        .color-palette { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 0.25rem; }
+        .color-swatch { width: 100%; height: 36px; border-radius: 8px; border: 2px solid transparent; cursor: pointer; transition: transform 0.1s, border-color 0.2s; }
+        .color-swatch:hover { transform: scale(1.05); }
+        .color-swatch.selected { border-color: var(--text-main); transform: scale(1.05); box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+
+        /* CALENDAR MONTH GRID UI */
+        .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        .cal-header button { background: var(--light-green); border: none; color: var(--primary-green); font-size: 1.1rem; font-weight: bold; padding: 0.4rem 0.8rem; border-radius: 6px; cursor: pointer; }
+        .cal-header h3 { font-size: 1.1rem; color: var(--primary-green); }
+        .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
+        .cal-day-name { font-size: 0.75rem; font-weight: bold; color: var(--text-muted); padding-bottom: 0.5rem; }
+        .cal-cell { min-height: 48px; background-color: var(--bg-color); border: 1px solid var(--border-color); border-radius: 6px; padding: 4px; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; transition: border-color 0.2s; }
+        .cal-cell:hover { border-color: var(--primary-green); }
+        .cal-cell.empty { background: transparent; border: none; cursor: default; }
+        .cal-cell.today { border: 2px solid var(--primary-green); font-weight: bold; }
+        .cal-cell.selected { background-color: var(--light-green); }
+        .cal-num { font-size: 0.8rem; color: var(--text-main); text-align: right; }
+        .cal-dots { display: flex; gap: 2px; flex-wrap: wrap; justify-content: center; margin-top: 2px; }
+        .cal-dot { width: 6px; height: 6px; border-radius: 50%; background-color: var(--primary-green); }
+        .cal-dot.intervention { background-color: #4a90e2; }
+        .cal-dot.life_event { background-color: #e67e22; }
+        .cal-dot.environmental { background-color: #8e44ad; }
+
+        /* HEATMAP GRID UI */
+        .heat-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; margin-top: 0.75rem; }
+        .heat-cell { aspect-ratio: 1; border-radius: 4px; background-color: var(--border-color); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: var(--text-main); cursor: pointer; position: relative; }
+        .heat-cell:hover::after { content: attr(data-tooltip); position: absolute; bottom: 110%; background: #333; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; white-space: nowrap; z-index: 20; pointer-events: none; }
+
+        /* Yearly Heatmap Grid Layout */
+        .yearly-heat-container { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 0.75rem; }
+        .month-mini-block { background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px; }
+        .month-mini-title { font-size: 0.75rem; font-weight: bold; color: var(--primary-green); text-align: center; margin-bottom: 4px; }
+        .month-mini-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; }
+        .month-mini-cell { aspect-ratio: 1; border-radius: 2px; background-color: var(--border-color); font-size: 0.5rem; display: flex; align-items: center; justify-content: center; }
+
+        /* Habit Split Comparison Cards */
+        .split-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.75rem; }
+        .split-box { background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; text-align: center; }
+        .split-box .val { font-size: 1.3rem; font-weight: bold; color: var(--primary-green); }
+        .split-box .lbl { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+        /* Events List */
+        .event-item { background-color: var(--bg-color); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.85rem; margin-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center; }
+        .event-text h4 { font-size: 0.95rem; color: var(--text-main); margin-bottom: 0.15rem; }
+        .event-text p { font-size: 0.75rem; color: var(--text-muted); }
+
+        /* Chart Containers */
+        .chart-container { position: relative; height: 260px; width: 100%; }
+        .no-data-msg { text-align: center; color: var(--text-muted); padding: 1.5rem; display: none; }
+        .corr-controls { display: flex; gap: 0.75rem; margin-bottom: 1.25rem; }
+        .corr-controls > div { flex: 1; }
+        .corr-controls label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.25rem; }
+
+        /* Modify View */
+        .var-list-item { display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; border-bottom: 1px solid var(--border-color); }
+        .var-list-item:last-child { border-bottom: none; }
+        .var-info { display: flex; flex-direction: column; gap: 4px; }
+        .var-info-header { display: flex; align-items: center; gap: 10px; }
+        .var-info-details { font-size: 0.75rem; color: var(--text-muted); margin-left: 26px; }
+        .color-dot { width: 16px; height: 16px; border-radius: 50%; }
+        .btn-delete { background: none; border: none; color: var(--danger-red); font-size: 0.9rem; font-weight: bold; cursor: pointer; padding: 0.5rem; }
+        
+        .add-var-form { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1rem; }
+        .add-var-row { display: flex; gap: 0.5rem; align-items: center; }
+        input[type="color"] { border: none; width: 44px; height: 44px; border-radius: 8px; cursor: pointer; padding: 0; background: none; flex-shrink: 0; }
+    </style>
+</head>
+<body class="theme-green font-medium">
+
+    <div class="app-container">
+        <nav>
+            <button id="back-btn" onclick="navigateTo('view-menu')">❮ Back</button>
+            <h1 id="nav-title">App Menu</h1>
+        </nav>
+
+        <div class="view-container">
+            <!-- VIEW 1: Menu -->
+            <div id="view-menu" class="view active">
+                <div class="menu-grid">
+                    <div class="menu-card" onclick="navigateTo('view-answer', 'Daily Check-in')">
+                        <div class="menu-icon">📝</div>
+                        <div class="menu-text"><h2>Answer</h2><p>Fill out your daily self-assessment</p></div>
+                    </div>
+                    <div class="menu-card" onclick="navigateTo('view-calendar', 'Calendar & Events')">
+                        <div class="menu-icon">📅</div>
+                        <div class="menu-text"><h2>Calendar</h2><p>View grid, periods & import iCal</p></div>
+                    </div>
+                    <div class="menu-card" onclick="navigateTo('view-visualise', 'Statistics & Visuals')">
+                        <div class="menu-icon">📊</div>
+                        <div class="menu-text"><h2>Visualise</h2><p>Trends, heatmaps & habit impact</p></div>
+                    </div>
+                    <div class="menu-card" onclick="navigateTo('view-modify', 'Modify Forms')">
+                        <div class="menu-icon">⚙️</div>
+                        <div class="menu-text"><h2>Modify</h2><p>Edit or create assessment forms</p></div>
+                    </div>
+                    <div class="menu-card" onclick="navigateTo('view-settings', 'Settings')">
+                        <div class="menu-icon">👤</div>
+                        <div class="menu-text"><h2>Settings</h2><p>Themes, font size & data export</p></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW 2: Answer -->
+            <div id="view-answer" class="view">
+                <form id="tracker-form">
+                    <div class="card">
+                        <h2>My Variables</h2>
+                        <div id="dynamic-sliders-container" style="margin-top: 1.25rem;"></div>
+                    </div>
+                    <div class="card">
+                        <h2>Specific Notes <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);">(Optional)</span></h2>
+                        <textarea id="notes" name="notes" placeholder="Quick trigger or highlight..." style="margin-top: 1.25rem;"></textarea>
+                    </div>
+                    <button type="submit" class="btn-main">Save Entry</button>
+                    <div id="success-message">Entry saved successfully!</div>
+                </form>
+            </div>
+
+            <!-- VIEW 3: Calendar -->
+            <div id="view-calendar" class="view">
+                <div class="card">
+                    <div class="cal-header">
+                        <button onclick="changeMonth(-1)">❮</button>
+                        <h3 id="cal-month-title">Month Year</h3>
+                        <button onclick="changeMonth(1)">❯</button>
+                    </div>
+                    <div class="cal-grid" id="cal-grid-container"></div>
+                </div>
+
+                <div class="card">
+                    <h2>Log Event / Situation</h2>
+                    <form id="event-form" class="add-var-form">
+                        <div>
+                            <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Title / Description</label>
+                            <input type="text" id="event-title" placeholder="e.g. Vacation, Started Supplement, Work Trip" required>
+                        </div>
+                        
+                        <div class="add-var-row">
+                            <div style="flex: 1;">
+                                <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Start Date</label>
+                                <input type="date" id="event-date" required>
+                            </div>
+                            <div style="flex: 1;">
+                                <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">End Date (Optional)</label>
+                                <input type="date" id="event-end-date">
+                            </div>
+                        </div>
+
+                        <div class="add-var-row">
+                            <div style="flex: 1;">
+                                <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Type</label>
+                                <select id="event-type">
+                                    <option value="intervention">Intervention (Habit/Meds)</option>
+                                    <option value="life_event">Life Event</option>
+                                    <option value="environmental">Situation/Environment</option>
+                                </select>
+                            </div>
+                            <div style="flex: 1;">
+                                <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Recurrence</label>
+                                <select id="event-recurrence">
+                                    <option value="none">None (Single/Period)</option>
+                                    <option value="daily">Daily</option>
+                                    <option value="weekly">Weekly</option>
+                                    <option value="monthly">Monthly</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn-main">Add to Calendar</button>
+                        <div id="event-success-message">Event logged successfully!</div>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h2>Import External Calendar</h2>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Import standard .ics files from Google Calendar, Apple, or Outlook.</p>
+                    <input type="file" id="ics-file-input" accept=".ics" style="display: none;" onchange="importICSFile(this)">
+                    <button type="button" class="btn-main" onclick="document.getElementById('ics-file-input').click()" style="background-color: var(--card-bg); color: var(--primary-green); border: 2px solid var(--primary-green);">📁 Select .ics File to Import</button>
+                </div>
+
+                <div class="card">
+                    <h2>Logged Calendar Events</h2>
+                    <div id="events-list" style="margin-top: 1rem;"></div>
+                    <div id="no-events-msg" class="no-data-msg" style="display: block;">No events marked yet.</div>
+                </div>
+            </div>
+
+            <!-- VIEW 4: Visualise -->
+            <div id="view-visualise" class="view">
+                
+                <!-- 1. UNIFIED TREND EXPLORER (Smoothed 7-day Moving Average) -->
+                <div class="card">
+                    <details open>
+                        <summary><h2>Trend Explorer (Smoothed)</h2></summary>
+                        <div class="collapsible-content">
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Showing 7-day smoothed averages to reveal clean trends over time.</p>
+                            <div class="corr-controls">
+                                <div>
+                                    <label>Time Range</label>
+                                    <select id="trend-time-range" onchange="renderUnifiedTrendChart()">
+                                        <option value="7">Last 7 Days</option>
+                                        <option value="30" selected>Last 30 Days</option>
+                                        <option value="90">Last 90 Days</option>
+                                        <option value="365">Last Year</option>
+                                        <option value="all">All-Time</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div id="no-trend-msg" class="no-data-msg">No entries in this time range.</div>
+                            <div class="chart-container"><canvas id="unifiedTrendChart"></canvas></div>
+                        </div>
+                    </details>
+                </div>
+
+                <!-- 2. SELECTABLE VISUAL HEATMAP (Monthly vs Yearly Overview) -->
+                <div class="card">
+                    <details open>
+                        <summary><h2>Visual Heatmap</h2></summary>
+                        <div class="collapsible-content">
+                            <div class="corr-controls">
+                                <div>
+                                    <label>Metric to Map</label>
+                                    <select id="heat-metric-select" onchange="renderHeatmapGrid()"></select>
+                                </div>
+                                <div>
+                                    <label>View Horizon</label>
+                                    <select id="heat-mode" onchange="toggleHeatmapHorizon()">
+                                        <option value="monthly">Monthly View</option>
+                                        <option value="yearly">Yearly Overview</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="corr-controls" id="heat-picker-wrapper">
+                                <div id="heat-month-container">
+                                    <label>Select Month</label>
+                                    <input type="month" id="heat-month-picker" onchange="renderHeatmapGrid()">
+                                </div>
+                                <div id="heat-year-container" style="display:none;">
+                                    <label>Select Year</label>
+                                    <select id="heat-year-picker" onchange="renderHeatmapGrid()">
+                                        <option value="2026">2026</option>
+                                        <option value="2025">2025</option>
+                                        <option value="2024">2024</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div id="heatmap-render-target"></div>
+                            <div id="no-heat-msg" class="no-data-msg">No logs found for this period.</div>
+                        </div>
+                    </details>
+                </div>
+
+                <!-- 3. INTERACTIVE HABIT SPLIT -->
+                <div class="card">
+                    <details open>
+                        <summary><h2>Habit Impact Split</h2></summary>
+                        <div class="collapsible-content">
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Compare your outcome metric (e.g. Mood) on days with high vs. low levels of a selected factor.</p>
+                            
+                            <div class="corr-controls">
+                                <div>
+                                    <label>Outcome Metric</label>
+                                    <select id="split-outcome" onchange="runHabitSplit()"></select>
+                                </div>
+                                <div>
+                                    <label>Factor to Split By</label>
+                                    <select id="split-factor" onchange="runHabitSplit()"></select>
+                                </div>
+                            </div>
+
+                            <div id="no-split-msg" class="no-data-msg">Not enough data to run habit split.</div>
+                            <div id="split-results" style="display: none;">
+                                <div class="split-grid">
+                                    <div class="split-box">
+                                        <div class="val" id="split-high-val">-</div>
+                                        <div class="lbl" id="split-high-lbl">High Days (Avg)</div>
+                                    </div>
+                                    <div class="split-box">
+                                        <div class="val" id="split-low-val">-</div>
+                                        <div class="lbl" id="split-low-lbl">Low Days (Avg)</div>
+                                    </div>
+                                </div>
+                                <div style="text-align: center; margin-top: 1rem; font-size: 0.9rem; font-weight: bold;" id="split-insight-text"></div>
+                            </div>
+                        </div>
+                    </details>
+                </div>
+
+                <!-- 4. SCATTER PLOT & TRENDLINE -->
+                <div class="card" id="card-scatter-target">
+                    <details open>
+                        <summary><h2>Scatter Plot & Trendline</h2></summary>
+                        <div class="collapsible-content">
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Detailed distribution and linear regression between selected variables</p>
+                            <div class="corr-controls">
+                                <div><label>X-Axis (Cause)</label><select id="corr-x" onchange="renderCorrelationChart()"></select></div>
+                                <div><label>Y-Axis (Effect)</label><select id="corr-y" onchange="renderCorrelationChart()"></select></div>
+                            </div>
+                            <div id="no-corr-data-msg" class="no-data-msg">Not enough data yet.</div>
+                            <div class="chart-container"><canvas id="correlationChart"></canvas></div>
+                        </div>
+                    </details>
+                </div>
+
+                <!-- 5. DAY-OF-WEEK CYCLICAL RHYTHM -->
+                <div class="card">
+                    <details open>
+                        <summary><h2>Day-of-Week Rhythm</h2></summary>
+                        <div class="collapsible-content">
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Average values across days of the week</p>
+                            <div class="corr-controls">
+                                <div>
+                                    <label>Select Variable</label>
+                                    <select id="dow-var" onchange="renderDayOfWeekChart()"></select>
+                                </div>
+                            </div>
+                            <div id="no-dow-msg" class="no-data-msg">Log more entries to reveal weekly cycles.</div>
+                            <div class="chart-container"><canvas id="dowChart"></canvas></div>
+                        </div>
+                    </details>
+                </div>
+
+            </div>
+
+            <!-- VIEW 5: Modify -->
+            <div id="view-modify" class="view">
+                <div class="card">
+                    <h2>Current Variables</h2>
+                    <div id="variables-list" style="margin-top: 1rem;"></div>
+                </div>
+                <div class="card">
+                    <h2>Add New Variable</h2>
+                    <form id="add-var-form" class="add-var-form">
+                        <div class="add-var-row">
+                            <input type="text" id="new-var-name" placeholder="Name (e.g. Meditated)" required>
+                        </div>
+                        
+                        <select id="new-var-type" onchange="toggleVarSettings()">
+                            <option value="slider">Quantitative (Number Slider)</option>
+                            <option value="binary">Binary (Yes / No)</option>
+                        </select>
+
+                        <div id="slider-settings" class="add-var-row">
+                            <input type="number" id="new-var-min" placeholder="Min" value="1" step="0.1">
+                            <input type="number" id="new-var-max" placeholder="Max" value="10" step="0.1">
+                            <input type="number" id="new-var-step" placeholder="Step" value="0.5" step="0.1">
+                        </div>
+
+                        <div style="margin-top: 0.5rem;">
+                            <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Color Theme</label>
+                            <div class="color-palette" id="color-palette-container"></div>
+                            
+                            <div style="margin-top: 0.5rem; text-align: right;">
+                                <button type="button" id="toggle-custom-btn" onclick="toggleCustomColorPicker()" style="background: none; border: none; color: var(--primary-green); font-size: 0.8rem; cursor: pointer; text-decoration: underline;">Use custom color spectrum</button>
+                            </div>
+
+                            <div id="custom-color-wrapper" style="display: none; margin-top: 0.5rem; align-items: center; gap: 0.75rem;">
+                                <input type="color" id="new-var-color-custom" value="#8e44ad" onchange="selectCustomColor(this.value)">
+                                <span style="font-size: 0.85rem; color: var(--text-muted);">Selected RGB color</span>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn-main" style="margin-top: 0.5rem;">Add Variable</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- VIEW 6: Settings -->
+            <div id="view-settings" class="view">
+                <div class="card">
+                    <h2>Appearance & Accessibility</h2>
+                    
+                    <div class="slider-group" style="margin-top: 1.25rem;">
+                        <label style="display: block; font-size: 0.9rem; margin-bottom: 0.5rem; font-weight: 500;">Main Color Scheme</label>
+                        <select id="setting-theme" onchange="saveSettings()">
+                            <option value="theme-green">Forest Green (Default)</option>
+                            <option value="theme-blue">Ocean Blue</option>
+                            <option value="theme-amber">Warm Amber</option>
+                            <option value="theme-dark">Dark Mode</option>
+                        </select>
+                    </div>
+
+                    <div class="slider-group" style="margin-top: 1rem;">
+                        <label style="display: block; font-size: 0.9rem; margin-bottom: 0.5rem; font-weight: 500;">Font Size</label>
+                        <select id="setting-fontsize" onchange="saveSettings()">
+                            <option value="font-small">Small</option>
+                            <option value="font-medium">Medium (Default)</option>
+                            <option value="font-large">Large</option>
+                            <option value="font-xl">Extra Large</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Data Storage & Management</h2>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin: 1rem 0; line-height: 1.4;">
+                        Your records and configurations are saved locally inside your browser's <code style="background: var(--light-green); padding: 2px 4px; border-radius: 4px;">localStorage</code>.
+                    </p>
+                    
+                    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                        <button type="button" class="btn-main" onclick="exportDataCSV()">Export Data as CSV</button>
+                        <button type="button" class="btn-main" onclick="exportDataJSON()" style="background-color: var(--card-bg); color: var(--primary-green); border: 2px solid var(--primary-green);">Export Data as JSON</button>
+                        
+                        <input type="file" id="json-import-input" accept=".json" style="display: none;" onchange="importDataJSON(this)">
+                        <button type="button" class="btn-main" onclick="document.getElementById('json-import-input').click()" style="background-color: var(--card-bg); color: var(--primary-green); border: 2px solid var(--primary-green);">📁 Import JSON Data</button>
+
+                        <button type="button" class="btn-main" onclick="clearAllData()" style="background-color: var(--danger-red);">Wipe All Saved Data</button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const DEFAULT_CONFIG = [
+            { id: "mood", label: "Overall Mood", color: "#2e8b57", type: "slider", min: 1, max: 10, step: 0.5 },
+            { id: "sleep", label: "Hours of Sleep", color: "#4a90e2", type: "slider", min: 0, max: 20, step: 0.5 },
+            { id: "workout", label: "Workout Intensity", color: "#e67e22", type: "slider", min: 1, max: 10, step: 0.5 },
+            { id: "masturbation", label: "Masturbation", color: "#8e44ad", type: "binary" }
+        ];
+
+        const COLOR_PALETTE = [
+            "#2e8b57", "#4a90e2", "#e67e22", "#8e44ad", "#e74c3c",
+            "#1abc9c", "#f1c40f", "#34495e", "#e91e63", "#795548"
+        ];
+        let selectedColorHex = COLOR_PALETTE[0];
+        let isUsingCustomColor = false;
+        let currentCalDate = new Date();
+
+        function getConfig() {
+            let config = JSON.parse(localStorage.getItem('moodTrackerConfig')) || DEFAULT_CONFIG;
+            let entries = JSON.parse(localStorage.getItem('moodTrackerEntries')) || [];
+            let existingIds = new Set(config.map(c => c.id));
+            let configUpdated = false;
+
+            entries.forEach(entry => {
+                Object.keys(entry).forEach(key => {
+                    if (key !== 'date' && key !== 'notes' && !existingIds.has(key)) {
+                        let formattedLabel = key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ');
+                        let assignedColor = COLOR_PALETTE[config.length % COLOR_PALETTE.length];
+                        config.push({ id: key, label: formattedLabel, color: assignedColor, type: 'slider', min: 1, max: 10, step: 0.5 });
+                        existingIds.add(key);
+                        configUpdated = true;
+                    }
+                });
+            });
+
+            if (configUpdated) localStorage.setItem('moodTrackerConfig', JSON.stringify(config));
+            return config;
+        }
+
+        function saveConfig(configArray) { localStorage.setItem('moodTrackerConfig', JSON.stringify(configArray)); }
+        function getEvents() { return JSON.parse(localStorage.getItem('moodTrackerEvents')) || []; }
+        function saveEvents(eventsArray) { localStorage.setItem('moodTrackerEvents', JSON.stringify(eventsArray)); }
+
+        let unifiedTrendChart = null, corrChart = null, dowChart = null;
+
+        function navigateTo(viewId, title = "App Menu") {
+            document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+            document.getElementById('nav-title').textContent = title;
+            document.getElementById('back-btn').style.display = viewId === 'view-menu' ? 'none' : 'block';
+
+            if (viewId === 'view-answer') renderAnswerForm();
+            if (viewId === 'view-calendar') {
+                document.getElementById('event-date').value = new Date().toISOString().split('T')[0];
+                renderCalendarGrid();
+                renderEventsList();
+            }
+            if (viewId === 'view-visualise') { 
+                populateVisualiseDropdowns();
+                renderUnifiedTrendChart();
+                renderHeatmapGrid();
+                runHabitSplit();
+                populateCorrelationDropdowns();
+                populateDayOfWeekDropdown();
+            }
+            if (viewId === 'view-modify') { renderModifyList(); renderColorPalette(); }
+            if (viewId === 'view-settings') loadSettingsToUI();
+        }
+
+        function populateVisualiseDropdowns() {
+            const config = getConfig();
+            const heatSelect = document.getElementById('heat-metric-select');
+            const outcomeSelect = document.getElementById('split-outcome');
+            const factorSelect = document.getElementById('split-factor');
+
+            heatSelect.innerHTML = '';
+            outcomeSelect.innerHTML = '';
+            factorSelect.innerHTML = '';
+
+            config.forEach(c => {
+                heatSelect.innerHTML += `<option value="${c.id}">${c.label}</option>`;
+                outcomeSelect.innerHTML += `<option value="${c.id}">${c.label}</option>`;
+                factorSelect.innerHTML += `<option value="${c.id}">${c.label}</option>`;
+            });
+
+            if (config.length > 1) {
+                factorSelect.selectedIndex = 1;
+            }
+
+            const now = new Date();
+            const yearMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            if (!document.getElementById('heat-month-picker').value) {
+                document.getElementById('heat-month-picker').value = yearMonthStr;
+            }
+        }
+
+        // --- 1. UNIFIED TREND EXPLORER (Smoothed 7-day Moving Average) ---
+        function renderUnifiedTrendChart() {
+            const rawData = JSON.parse(localStorage.getItem('moodTrackerEntries')) || [];
+            const config = getConfig();
+            const rangeVal = document.getElementById('trend-time-range').value;
+            const canvas = document.getElementById('unifiedTrendChart');
+            const noMsg = document.getElementById('no-trend-msg');
+
+            if (rawData.length === 0) {
+                noMsg.style.display = 'block';
+                canvas.style.display = 'none';
+                return;
+            }
+
+            rawData.sort((a, b) => new Date(a.date) - new Date(b.date));
+            let filteredData = rawData;
+
+            if (rangeVal !== 'all') {
+                const days = parseInt(rangeVal);
+                const cutoff = new Date().getTime() - (days * 24 * 60 * 60 * 1000);
+                filteredData = rawData.filter(e => new Date(e.date).getTime() >= cutoff);
+            }
+
+            if (filteredData.length === 0) {
+                noMsg.style.display = 'block';
+                canvas.style.display = 'none';
+                return;
+            } else {
+                noMsg.style.display = 'none';
+                canvas.style.display = 'block';
+            }
+
+            const labels = filteredData.map(e => new Date(e.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
+            let datasets = [];
+
+            config.forEach(field => {
+                const rawValues = filteredData.map(e => e[field.id] !== undefined ? e[field.id] : null);
+                
+                // Calculate 7-Day Moving Average to smooth out graph noise
+                const smaValues = rawValues.map((val, idx) => {
+                    let sum = 0, count = 0;
+                    for (let k = Math.max(0, idx - 6); k <= idx; k++) {
+                        if (rawValues[k] !== null && rawValues[k] !== undefined) {
+                            sum += rawValues[k];
+                            count++;
+                        }
+                    }
+                    return count > 0 ? (sum / count) : null;
+                });
+
+                datasets.push({
+                    label: `${field.label} (7d Smooth)`,
+                    data: smaValues,
+                    borderColor: field.color,
+                    backgroundColor: field.color + '20',
+                    borderWidth: 3,
+                    pointRadius: 0,
+                    tension: 0.4,
+                    fill: false
+                });
+            });
+
+            if (unifiedTrendChart) unifiedTrendChart.destroy();
+            unifiedTrendChart = new Chart(canvas.getContext('2d'), {
+                type: 'line',
+                data: { labels, datasets },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    scales: { y: { beginAtZero: true } }, 
+                    plugins: { legend: { position: 'top', labels: { boxWidth: 12 } } } 
+                }
+            });
+        }
+
+        // --- 2. SELECTABLE VISUAL HEATMAP (Monthly vs Yearly Overview) ---
+        function toggleHeatmapHorizon() {
+            const mode = document.getElementById('heat-mode').value;
+            document.getElementById('heat-month-container').style.display = mode === 'monthly' ? 'block' : 'none';
+            document.getElementById('heat-year-container').style.display = mode === 'yearly' ? 'block' : 'none';
+            renderHeatmapGrid();
+        }
+
+        function renderHeatmapGrid() {
+            const rawData = JSON.parse(localStorage.getItem('moodTrackerEntries')) || [];
+            const metricId = document.getElementById('heat-metric-select').value;
+            const mode = document.getElementById('heat-mode').value;
+            const container = document.getElementById('heatmap-render-target');
+            const noMsg = document.getElementById('no-heat-msg');
+
+            container.innerHTML = '';
+            if (rawData.length === 0 || !metricId) {
+                noMsg.style.display = 'block';
+                return;
+            }
+
+            let entryMap = {};
+            rawData.forEach(e => {
+                let dStr = e.date.split('T')[0];
+                entryMap[dStr] = e[metricId];
+            });
+
+            let metricVals = Object.values(entryMap).filter(v => v !== undefined && v !== null);
+            let minV = metricVals.length > 0 ? Math.min(...metricVals) : 0;
+            let maxV = metricVals.length > 0 ? Math.max(...metricVals) : 10;
+            if (minV === maxV) maxV = minV + 1;
+
+            if (mode === 'monthly') {
+                const monthPickerVal = document.getElementById('heat-month-picker').value;
+                if (!monthPickerVal) { noMsg.style.display = 'block'; return; }
+
+                const [year, month] = monthPickerVal.split('-').map(Number);
+                const firstDayOfMonth = new Date(year, month - 1, 1);
+                let startDayIdx = firstDayOfMonth.getDay() - 1;
+                if (startDayIdx === -1) startDayIdx = 6;
+                const totalDays = new Date(year, month, 0).getDate();
+
+                let html = `
+                    <div class="cal-grid" id="heat-day-names" style="margin-bottom: 4px;">
+                        <div class="cal-day-name">Mon</div><div class="cal-day-name">Tue</div><div class="cal-day-name">Wed</div>
+                        <div class="cal-day-name">Thu</div><div class="cal-day-name">Fri</div><div class="cal-day-name">Sat</div><div class="cal-day-name">Sun</div>
+                    </div>
+                    <div class="heat-grid" id="heatmap-grid-inner"></div>
+                `;
+                container.innerHTML = html;
+                const innerGrid = document.getElementById('heatmap-grid-inner');
+
+                for (let i = 0; i < startDayIdx; i++) {
+                    innerGrid.innerHTML += `<div class="heat-cell" style="background:transparent; border:none; cursor:default;"></div>`;
+                }
+
+                let renderedCount = 0;
+                for (let day = 1; day <= totalDays; day++) {
+                    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    const val = entryMap[dateStr];
+                    let bg = 'var(--border-color)';
+                    let tooltip = `${dateStr}: No data`;
+
+                    if (val !== undefined && val !== null) {
+                        renderedCount++;
+                        let pct = (val - minV) / (maxV - minV);
+                        bg = `rgba(46, 139, 87, ${Math.max(0.2, pct)})`;
+                        tooltip = `${dateStr}: ${val}`;
+                    }
+                    innerGrid.innerHTML += `<div class="heat-cell" style="background-color: ${bg};" data-tooltip="${tooltip}">${day}</div>`;
+                }
+                noMsg.style.display = renderedCount === 0 ? 'block' : 'none';
+
+            } else {
+                // Yearly Overview Mode
+                const selectedYear = parseInt(document.getElementById('heat-year-picker').value);
+                const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                
+                let html = `<div class="yearly-heat-container" id="yearly-heat-inner"></div>`;
+                container.innerHTML = html;
+                const yearlyInner = document.getElementById('yearly-heat-inner');
+
+                let totalRendered = 0;
+                monthNames.forEach((mName, mIdx) => {
+                    let mNum = mIdx + 1;
+                    let daysInMonth = new Date(selectedYear, mNum, 0).getDate();
+                    
+                    let miniHtml = `<div class="month-mini-block"><div class="month-mini-title">${mName}</div><div class="month-mini-grid">`;
+                    
+                    for (let d = 1; d <= daysInMonth; d++) {
+                        const dateStr = `${selectedYear}-${String(mNum).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                        const val = entryMap[dateStr];
+                        let bg = 'var(--border-color)';
+                        if (val !== undefined && val !== null) {
+                            totalRendered++;
+                            let pct = (val - minV) / (maxV - minV);
+                            bg = `rgba(46, 139, 87, ${Math.max(0.2, pct)})`;
+                        }
+                        miniHtml += `<div class="month-mini-cell" style="background-color: ${bg};" title="${dateStr}: ${val !== undefined ? val : 'No data'}"></div>`;
+                    }
+                    miniHtml += `</div></div>`;
+                    yearlyInner.innerHTML += miniHtml;
+                });
+                noMsg.style.display = totalRendered === 0 ? 'block' : 'none';
+            }
+        }
+
+        // --- 3. INTERACTIVE HABIT SPLIT ---
+        function runHabitSplit() {
+            const outcomeId = document.getElementById('split-outcome').value;
+            const factorId = document.getElementById('split-factor').value;
+            const rawData = JSON.parse(localStorage.getItem('moodTrackerEntries')) || [];
+            const noMsg = document.getElementById('no-split-msg');
+            const resultsDiv = document.getElementById('split-results');
+
+            if (rawData.length < 3 || !outcomeId || !factorId) {
+                noMsg.style.display = 'block';
+                resultsDiv.style.display = 'none';
+                return;
+            }
+
+            let pairs = [];
+            rawData.forEach(e => {
+                if (e[outcomeId] !== undefined && e[outcomeId] !== null && e[factorId] !== undefined && e[factorId] !== null) {
+                    pairs.push({ outcome: e[outcomeId], factor: e[factorId] });
+                }
+            });
+
+            if (pairs.length < 3) {
+                noMsg.style.display = 'block';
+                resultsDiv.style.display = 'none';
+                return;
+            }
+
+            noMsg.style.display = 'none';
+            resultsDiv.style.display = 'block';
+
+            let factorVals = pairs.map(p => p.factor).sort((a,b) => a - b);
+            let medianFactor = factorVals[Math.floor(factorVals.length / 2)];
+
+            let highGroup = pairs.filter(p => p.factor >= medianFactor).map(p => p.outcome);
+            let lowGroup = pairs.filter(p => p.factor < medianFactor).map(p => p.outcome);
+
+            let highAvg = highGroup.length > 0 ? (highGroup.reduce((a,b)=>a+b,0)/highGroup.length) : 0;
+            let lowAvg = lowGroup.length > 0 ? (lowGroup.reduce((a,b)=>a+b,0)/lowGroup.length) : 0;
+
+            document.getElementById('split-high-val').textContent = highAvg.toFixed(2);
+            document.getElementById('split-low-val').textContent = lowAvg.toFixed(2);
+            document.getElementById('split-high-lbl').textContent = `High ${factorId} Days (Avg)`;
+            document.getElementById('split-low-lbl').textContent = `Low ${factorId} Days (Avg)`;
+
+            let diff = highAvg - lowAvg;
+            let text = diff > 0 ? `+${diff.toFixed(2)} higher outcome on high factor days!` : `${diff.toFixed(2)} outcome difference on high factor days.`;
+            document.getElementById('split-insight-text').textContent = text;
+        }
+
+        // --- 4. SCATTER PLOT & TRENDLINE ---
+        function populateCorrelationDropdowns() {
+            const config = getConfig();
+            const xSelect = document.getElementById('corr-x');
+            const ySelect = document.getElementById('corr-y');
+            xSelect.innerHTML = ''; ySelect.innerHTML = '';
+            config.forEach(field => {
+                xSelect.innerHTML += `<option value="${field.id}">${field.label}</option>`;
+                ySelect.innerHTML += `<option value="${field.id}">${field.label}</option>`;
+            });
+            if (config.length > 1) { xSelect.selectedIndex = 1; ySelect.selectedIndex = 0; }
+            renderCorrelationChart();
+        }
+
+        function calculateLinearRegressionSimple(data) {
+            if (data.length === 0) return null;
+            let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+            let n = data.length;
+            let minX = Infinity, maxX = -Infinity;
+            data.forEach(pt => {
+                sumX += pt.x; sumY += pt.y; sumXY += pt.x * pt.y; sumXX += pt.x * pt.x;
+                if (pt.x < minX) minX = pt.x; if (pt.x > maxX) maxX = pt.x;
+            });
+            let den = (n * sumXX) - (sumX * sumX);
+            if (den === 0) return null; 
+            let m = ((n * sumXY) - (sumX * sumY)) / den;
+            let b = (sumY - (m * sumX)) / n;
+            return [{ x: minX, y: m * minX + b }, { x: maxX, y: m * maxX + b }];
+        }
+
+        function renderCorrelationChart() {
+            const rawData = JSON.parse(localStorage.getItem('moodTrackerEntries')) || [];
+            const config = getConfig();
+            const xId = document.getElementById('corr-x').value;
+            const yId = document.getElementById('corr-y').value;
+            const canvas = document.getElementById('correlationChart');
+            const noDataMsg = document.getElementById('no-corr-data-msg');
+
+            if (rawData.length === 0 || !xId || !yId) return;
+
+            const xConfig = config.find(c => c.id === xId);
+            const yConfig = config.find(c => c.id === yId);
+
+            const scatterData = [];
+            rawData.forEach(entry => {
+                const xVal = entry[xId];
+                const yVal = entry[yId];
+                if (xVal !== undefined && xVal !== null && yVal !== undefined && yVal !== null) {
+                    scatterData.push({ x: xVal, y: yVal });
+                }
+            });
+
+            if (scatterData.length === 0) {
+                noDataMsg.style.display = 'block'; canvas.style.display = 'none'; return;
+            } else {
+                noDataMsg.style.display = 'none'; canvas.style.display = 'block';
+            }
+
+            let datasets = [{
+                type: 'scatter',
+                label: `${yConfig.label} vs ${xConfig.label}`,
+                data: scatterData,
+                backgroundColor: yConfig.color + '80', 
+                borderColor: yConfig.color,
+                borderWidth: 1, pointRadius: 6, pointHoverRadius: 8
+            }];
+
+            if (scatterData.length > 1) {
+                const regressionLine = calculateLinearRegressionSimple(scatterData);
+                if (regressionLine) {
+                    datasets.push({
+                        type: 'line', label: 'Trendline', data: regressionLine,
+                        borderColor: '#999999', borderWidth: 2, borderDash: [5, 5], pointRadius: 0, fill: false
+                    });
+                }
+            }
+
+            if (corrChart) corrChart.destroy();
+            corrChart = new Chart(canvas.getContext('2d'), {
+                data: { datasets: datasets },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        x: { beginAtZero: true, title: { display: true, text: xConfig.label } },
+                        y: { beginAtZero: true, title: { display: true, text: yConfig.label } }
+                    }
+                }
+            });
+        }
+
+        // --- 5. DAY OF WEEK CYCLICAL BASELINE ---
+        function populateDayOfWeekDropdown() {
+            const config = getConfig();
+            const select = document.getElementById('dow-var');
+            select.innerHTML = '';
+            config.forEach(c => {
+                select.innerHTML += `<option value="${c.id}">${c.label}</option>`;
+            });
+            renderDayOfWeekChart();
+        }
+
+        function renderDayOfWeekChart() {
+            const rawData = JSON.parse(localStorage.getItem('moodTrackerEntries')) || [];
+            const varId = document.getElementById('dow-var').value;
+            const canvas = document.getElementById('dowChart');
+            const noMsg = document.getElementById('no-dow-msg');
+            const config = getConfig();
+
+            if (rawData.length === 0 || !varId) {
+                noMsg.style.display = 'block';
+                canvas.style.display = 'none';
+                return;
+            }
+
+            const fieldConfig = config.find(c => c.id === varId);
+            let dowSums = [0, 0, 0, 0, 0, 0, 0];
+            let dowCounts = [0, 0, 0, 0, 0, 0, 0];
+
+            rawData.forEach(e => {
+                const val = e[varId];
+                if (val !== undefined && val !== null) {
+                    const dayIdx = new Date(e.date).getDay();
+                    dowSums[dayIdx] += val;
+                    dowCounts[dayIdx]++;
+                }
+            });
+
+            const dayOrder = [1, 2, 3, 4, 5, 6, 0];
+            const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+            const averages = dayOrder.map(idx => dowCounts[idx] > 0 ? (dowSums[idx] / dowCounts[idx]) : 0);
+
+            const hasData = dowCounts.some(c => c > 0);
+            if (!hasData) {
+                noMsg.style.display = 'block';
+                canvas.style.display = 'none';
+                return;
+            } else {
+                noMsg.style.display = 'none';
+                canvas.style.display = 'block';
+            }
+
+            if (dowChart) dowChart.destroy();
+            dowChart = new Chart(canvas.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: dayLabels,
+                    datasets: [{
+                        label: `Avg ${fieldConfig.label}`,
+                        data: averages,
+                        backgroundColor: fieldConfig.color + 'CC',
+                        borderRadius: 6
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+            });
+        }
+
+        // --- CALENDAR GRID LOGIC ---
+        function changeMonth(delta) {
+            currentCalDate.setMonth(currentCalDate.getMonth() + delta);
+            renderCalendarGrid();
+        }
+
+        function renderCalendarGrid() {
+            const year = currentCalDate.getFullYear();
+            const month = currentCalDate.getMonth();
+            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+            
+            document.getElementById('cal-month-title').textContent = `${monthNames[month]} ${year}`;
+
+            const grid = document.getElementById('cal-grid-container');
+            grid.innerHTML = '';
+
+            const dayHeaders = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+            dayHeaders.forEach(dh => grid.innerHTML += `<div class="cal-day-name">${dh}</div>`);
+
+            const firstDayOfMonth = new Date(year, month, 1);
+            let startDayIdx = firstDayOfMonth.getDay() - 1;
+            if (startDayIdx === -1) startDayIdx = 6;
+
+            const totalDays = new Date(year, month + 1, 0).getDate();
+
+            for (let i = 0; i < startDayIdx; i++) {
+                grid.innerHTML += `<div class="cal-cell empty"></div>`;
+            }
+
+            const events = getEvents();
+            const todayStr = new Date().toISOString().split('T')[0];
+
+            for (let day = 1; day <= totalDays; day++) {
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const isToday = dateStr === todayStr ? 'today' : '';
+                const matchingEvents = events.filter(e => isEventActiveOnDate(e, dateStr));
+
+                let dotsHtml = '<div class="cal-dots">';
+                matchingEvents.forEach(me => {
+                    dotsHtml += `<div class="cal-dot ${me.type || 'intervention'}" title="${me.title}"></div>`;
+                });
+                dotsHtml += '</div>';
+
+                grid.innerHTML += `
+                    <div class="cal-cell ${isToday}" onclick="selectCalendarDate('${dateStr}')">
+                        <div class="cal-num">${day}</div>
+                        ${dotsHtml}
+                    </div>
+                `;
+            }
+        }
+
+        function isEventActiveOnDate(evt, targetDateStr) {
+            const targetTime = new Date(targetDateStr + 'T00:00:00').getTime();
+            const startTime = new Date(evt.date + 'T00:00:00').getTime();
+            const endTime = evt.endDate ? new Date(evt.endDate + 'T00:00:00').getTime() : startTime;
+
+            if (targetTime >= startTime && targetTime <= endTime) return true;
+
+            if (evt.recurrence && evt.recurrence !== 'none' && targetTime >= startTime) {
+                const targetD = new Date(targetDateStr + 'T00:00:00');
+                const startD = new Date(evt.date + 'T00:00:00');
+
+                if (evt.recurrence === 'daily') return true;
+                if (evt.recurrence === 'weekly' && targetD.getDay() === startD.getDay()) return true;
+                if (evt.recurrence === 'monthly' && targetD.getDate() === startD.getDate()) return true;
+            }
+
+            return false;
+        }
+
+        function selectCalendarDate(dateStr) {
+            document.getElementById('event-date').value = dateStr;
+            document.getElementById('event-title').focus();
+        }
+
+        // --- ICAL (.ICS) PARSER LOGIC ---
+        function importICSFile(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                const events = parseICS(text);
+                
+                if (events.length > 0) {
+                    const existing = getEvents();
+                    const combined = existing.concat(events);
+                    combined.sort((a, b) => new Date(a.date) - new Date(b.date));
+                    saveEvents(combined);
+                    alert(`Successfully imported ${events.length} events from calendar file!`);
+                    renderCalendarGrid();
+                    renderEventsList();
+                } else {
+                    alert("No valid events could be parsed from this file.");
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function parseICS(icsData) {
+            const parsedEvents = [];
+            const lines = icsData.split(/\r\n|\n|\r/);
+            let inEvent = false;
+            let currentEvt = {};
+
+            lines.forEach(line => {
+                if (line.startsWith('BEGIN:VEVENT')) {
+                    inEvent = true;
+                    currentEvt = { id: 'ics_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4), type: 'life_event', recurrence: 'none' };
+                } else if (line.startsWith('END:VEVENT')) {
+                    if (currentEvt.title && currentEvt.date) {
+                        parsedEvents.push(currentEvt);
+                    }
+                    inEvent = false;
+                } else if (inEvent) {
+                    if (line.startsWith('SUMMARY:')) {
+                        currentEvt.title = line.replace('SUMMARY:', '').trim();
+                    } else if (line.startsWith('DTSTART')) {
+                        const val = line.split(':')[1];
+                        if (val && val.length >= 8) {
+                            currentEvt.date = `${val.substr(0,4)}-${val.substr(4,2)}-${val.substr(6,2)}`;
+                        }
+                    } else if (line.startsWith('DTEND')) {
+                        const val = line.split(':')[1];
+                        if (val && val.length >= 8) {
+                            currentEvt.endDate = `${val.substr(0,4)}-${val.substr(4,2)}-${val.substr(6,2)}`;
+                        }
+                    }
+                }
+            });
+
+            return parsedEvents;
+        }
+
+        document.getElementById('event-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const date = document.getElementById('event-date').value;
+            const endDate = document.getElementById('event-end-date').value;
+            const title = document.getElementById('event-title').value.trim();
+            const type = document.getElementById('event-type').value;
+            const recurrence = document.getElementById('event-recurrence').value;
+
+            if (!date || !title) return;
+
+            const events = getEvents();
+            events.push({ id: 'evt_' + Date.now(), date, endDate, title, type, recurrence });
+            events.sort((a, b) => new Date(a.date) - new Date(b.date));
+            saveEvents(events);
+
+            document.getElementById('event-title').value = '';
+            document.getElementById('event-end-date').value = '';
+            const msg = document.getElementById('event-success-message');
+            msg.style.display = 'block';
+            setTimeout(() => msg.style.display = 'none', 3000);
+            renderCalendarGrid();
+            renderEventsList();
+        });
+
+        function renderEventsList() {
+            const events = getEvents();
+            const container = document.getElementById('events-list');
+            const noMsg = document.getElementById('no-events-msg');
+
+            container.innerHTML = '';
+            if (events.length === 0) {
+                noMsg.style.display = 'block';
+                return;
+            } else {
+                noMsg.style.display = 'none';
+            }
+
+            events.forEach(evt => {
+                const formattedDate = new Date(evt.date + 'T00:00:00').toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+                let rangeText = formattedDate;
+                if (evt.endDate && evt.endDate !== evt.date) {
+                    const formattedEnd = new Date(evt.endDate + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                    rangeText += ` ➔ ${formattedEnd}`;
+                }
+                if (evt.recurrence && evt.recurrence !== 'none') {
+                    rangeText += ` (${evt.recurrence.toUpperCase()})`;
+                }
+
+                container.innerHTML += `
+                    <div class="event-item">
+                        <div class="event-text">
+                            <h4>${evt.title}</h4>
+                            <p>${rangeText} • ${evt.type.replace('_', ' ').toUpperCase()}</p>
+                        </div>
+                        <button class="btn-delete" onclick="removeEvent('${evt.id}')">Remove</button>
+                    </div>
+                `;
+            });
+        }
+
+        function removeEvent(evtId) {
+            if (!confirm("Remove this event marker?")) return;
+            let events = getEvents();
+            events = events.filter(e => e.id !== evtId);
+            saveEvents(events);
+            renderCalendarGrid();
+            renderEventsList();
+        }
+
+        // --- SETTINGS & ACCESSIBILITY LOGIC ---
+        function loadSettings() {
+            const settings = JSON.parse(localStorage.getItem('moodTrackerSettings')) || { theme: 'theme-green', fontsize: 'font-medium' };
+            applySettingsToBody(settings);
+        }
+
+        function loadSettingsToUI() {
+            const settings = JSON.parse(localStorage.getItem('moodTrackerSettings')) || { theme: 'theme-green', fontsize: 'font-medium' };
+            document.getElementById('setting-theme').value = settings.theme;
+            document.getElementById('setting-fontsize').value = settings.fontsize;
+        }
+
+        function saveSettings() {
+            const theme = document.getElementById('setting-theme').value;
+            const fontsize = document.getElementById('setting-fontsize').value;
+            const settings = { theme, fontsize };
+            localStorage.setItem('moodTrackerSettings', JSON.stringify(settings));
+            applySettingsToBody(settings);
+        }
+
+        function applySettingsToBody(settings) {
+            document.body.className = `${settings.theme} ${settings.fontsize}`;
+        }
+
+        function exportDataCSV() {
+            const entries = JSON.parse(localStorage.getItem('moodTrackerEntries')) || [];
+            const config = getConfig();
+            if (entries.length === 0) { alert("No recorded entries available to export!"); return; }
+
+            let headers = ['Date', 'Notes'];
+            config.forEach(c => headers.push(c.label));
+            let csvRows = [headers.join(',')];
+
+            entries.forEach(entry => {
+                let row = [`"${entry.date}"`, `"${(entry.notes || '').replace(/"/g, '""')}"`];
+                config.forEach(c => row.push(entry[c.id] !== undefined ? entry[c.id] : ''));
+                csvRows.push(row.join(','));
+            });
+
+            let blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+            let url = URL.createObjectURL(blob);
+            let a = document.createElement('a');
+            a.href = url; a.download = `mood_tracker_data_${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        }
+
+        function exportDataJSON() {
+            const entries = JSON.parse(localStorage.getItem('moodTrackerEntries')) || [];
+            if (entries.length === 0) {
+                alert("No recorded entries available to export!");
+                return;
+            }
+
+            let blob = new Blob([JSON.stringify(entries, null, 2)], { type: 'application/json;charset=utf-8;' });
+            let url = URL.createObjectURL(blob);
+            let a = document.createElement('a');
+            a.href = url;
+            a.download = `mood_tracker_data_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        function importDataJSON(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    if (Array.isArray(importedData)) {
+                        if (confirm(`Found ${importedData.length} entries. Merge with existing data? (OK to merge, Cancel to overwrite)`)) {
+                            let currentData = JSON.parse(localStorage.getItem('moodTrackerEntries')) || [];
+                            let combinedData = currentData.concat(importedData);
+                            const uniqueData = Array.from(new Map(combinedData.map(item => [item.date, item])).values());
+                            localStorage.setItem('moodTrackerEntries', JSON.stringify(uniqueData));
+                        } else {
+                            localStorage.setItem('moodTrackerEntries', JSON.stringify(importedData));
+                        }
+                        alert("Data successfully imported! Reloading app.");
+                        location.reload();
+                    } else {
+                        alert("Invalid JSON format. Expected an array.");
+                    }
+                } catch (err) {
+                    alert("Error parsing JSON file.");
+                }
+            };
+            reader.readAsText(file);
+            input.value = '';
+        }
+
+        function clearAllData() {
+            if (confirm("Are you sure you want to delete all saved entries and events?")) {
+                localStorage.removeItem('moodTrackerEntries');
+                localStorage.removeItem('moodTrackerEvents');
+                alert("All logs wiped.");
+            }
+        }
+
+        // --- COLOR PALETTE LOGIC ---
+        function renderColorPalette() {
+            const container = document.getElementById('color-palette-container');
+            container.innerHTML = '';
+            COLOR_PALETTE.forEach(hex => {
+                const isSelected = (!isUsingCustomColor && selectedColorHex === hex);
+                container.innerHTML += `<div class="color-swatch ${isSelected ? 'selected' : ''}" style="background-color: ${hex};" onclick="selectPaletteColor('${hex}')"></div>`;
+            });
+        }
+
+        function selectPaletteColor(hex) {
+            selectedColorHex = hex; isUsingCustomColor = false;
+            document.getElementById('custom-color-wrapper').style.display = 'none';
+            document.getElementById('toggle-custom-btn').textContent = "Use custom color spectrum";
+            renderColorPalette();
+        }
+
+        function toggleCustomColorPicker() {
+            isUsingCustomColor = !isUsingCustomColor;
+            const wrapper = document.getElementById('custom-color-wrapper');
+            const btn = document.getElementById('toggle-custom-btn');
+            if (isUsingCustomColor) {
+                wrapper.style.display = 'flex'; btn.textContent = "Use preset palette";
+                selectedColorHex = document.getElementById('new-var-color-custom').value;
+                document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+            } else {
+                wrapper.style.display = 'none'; btn.textContent = "Use custom color spectrum";
+                selectedColorHex = COLOR_PALETTE[0]; renderColorPalette();
+            }
+        }
+
+        function selectCustomColor(hex) { selectedColorHex = hex; }
+
+        // --- ANSWER FORM LOGIC ---
+        function updateValue(id, value) { document.getElementById('val-' + id).textContent = parseFloat(value).toFixed(1); }
+        function updateBinaryText(id, isChecked) {
+            document.getElementById('val-' + id).textContent = isChecked ? 'Yes' : 'No';
+            document.getElementById('val-' + id).style.color = isChecked ? 'var(--primary-green)' : 'var(--text-muted)';
+        }
+
+        function renderAnswerForm() {
+            const config = getConfig();
+            const container = document.getElementById('dynamic-sliders-container');
+            container.innerHTML = '';
+            config.forEach(field => {
+                let type = field.type || 'slider';
+                if (type === 'slider') {
+                    let min = field.min !== undefined ? field.min : 1;
+                    let max = field.max !== undefined ? field.max : 10;
+                    let step = field.step !== undefined ? field.step : 0.5;
+                    let defaultVal = ((min + max) / 2).toFixed(1);
+                    container.innerHTML += `
+                        <div class="slider-group">
+                            <div class="slider-label-wrapper">
+                                <span>${field.label}</span>
+                                <span class="slider-value" id="val-${field.id}" style="color: ${field.color}">${defaultVal}</span>
+                            </div>
+                            <input type="range" id="${field.id}" name="${field.id}" min="${min}" max="${max}" step="${step}" value="${defaultVal}" oninput="updateValue('${field.id}', this.value)">
+                        </div>
+                    `;
+                } else if (type === 'binary') {
+                    container.innerHTML += `
+                        <div class="slider-group" style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-weight: 500; font-size: 0.95rem;">${field.label}</span>
+                            <div style="display: flex; align-items: center;">
+                                <label class="switch">
+                                    <input type="checkbox" id="${field.id}" onchange="updateBinaryText('${field.id}', this.checked)">
+                                    <span class="slider-switch"></span>
+                                </label>
+                                <span class="binary-text" id="val-${field.id}" style="color: var(--text-muted)">No</span>
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+        }
+
+        document.getElementById('tracker-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const formData = new FormData(event.target);
+            const config = getConfig();
+            const newEntry = { date: new Date().toISOString(), notes: formData.get('notes') };
+            config.forEach(field => { 
+                let type = field.type || 'slider';
+                if (type === 'binary') {
+                    newEntry[field.id] = document.getElementById(field.id).checked ? 1 : 0;
+                } else {
+                    newEntry[field.id] = parseFloat(formData.get(field.id)); 
+                }
+            });
+            let entries = JSON.parse(localStorage.getItem('moodTrackerEntries')) || [];
+            entries.push(newEntry);
+            localStorage.setItem('moodTrackerEntries', JSON.stringify(entries));
+
+            const successMsg = document.getElementById('success-message');
+            successMsg.style.display = 'block';
+            event.target.reset();
+            renderAnswerForm();
+            setTimeout(() => successMsg.style.display = 'none', 3000);
+        });
+
+        // --- MODIFY LOGIC ---
+        function toggleVarSettings() {
+            const type = document.getElementById('new-var-type').value;
+            document.getElementById('slider-settings').style.display = type === 'slider' ? 'flex' : 'none';
+        }
+
+        function renderModifyList() {
+            const config = getConfig();
+            const listContainer = document.getElementById('variables-list');
+            listContainer.innerHTML = '';
+            config.forEach(field => {
+                let type = field.type || 'slider';
+                let details = type === 'binary' ? 'Type: Binary (Yes/No)' : `Type: Quantitative (${field.min || 1} to ${field.max || 10})`;
+                listContainer.innerHTML += `
+                    <div class="var-list-item">
+                        <div class="var-info">
+                            <div class="var-info-header">
+                                <div class="color-dot" style="background-color: ${field.color};"></div>
+                                <strong>${field.label}</strong>
+                            </div>
+                            <div class="var-info-details">${details}</div>
+                        </div>
+                        <button class="btn-delete" onclick="removeVariable('${field.id}')">Remove</button>
+                    </div>
+                `;
+            });
+        }
+
+        document.getElementById('add-var-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const labelInput = document.getElementById('new-var-name').value.trim();
+            const typeInput = document.getElementById('new-var-type').value;
+            if (!labelInput) return;
+            const safeId = labelInput.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Date.now();
+            let newVar = { id: safeId, label: labelInput, color: selectedColorHex, type: typeInput };
+            if (typeInput === 'slider') {
+                newVar.min = parseFloat(document.getElementById('new-var-min').value);
+                newVar.max = parseFloat(document.getElementById('new-var-max').value);
+                newVar.step = parseFloat(document.getElementById('new-var-step').value);
+            }
+            const config = getConfig();
+            config.push(newVar);
+            saveConfig(config);
+            event.target.reset();
+            toggleVarSettings(); 
+            selectPaletteColor(COLOR_PALETTE[0]);
+            renderModifyList();
+        });
+
+        function removeVariable(idToRemove) {
+            if (!confirm("Are you sure?")) return;
+            let config = getConfig();
+            config = config.filter(field => field.id !== idToRemove);
+            saveConfig(config);
+            renderModifyList();
+        }
+
+        loadSettings();
+        renderAnswerForm();
+    </script>
+</body>
+</html>
