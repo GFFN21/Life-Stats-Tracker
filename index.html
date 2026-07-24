@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="manifest.json">
     <title>Daily Mood & Habit Tracker</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -181,7 +182,7 @@
                     </div>
                     <div class="menu-card" onclick="navigateTo('view-settings', 'Settings')">
                         <div class="menu-icon">👤</div>
-                        <div class="menu-text"><h2>Settings</h2><p>Themes, font size & data export</p></div>
+                        <div class="menu-text"><h2>Settings</h2><p>Notifications, themes & data export</p></div>
                     </div>
                 </div>
             </div>
@@ -274,7 +275,7 @@
             <!-- VIEW 4: Visualise -->
             <div id="view-visualise" class="view">
                 
-                <!-- 1. UNIFIED TREND EXPLORER (Smoothed 7-day Moving Average) -->
+                <!-- 1. UNIFIED TREND EXPLORER -->
                 <div class="card">
                     <details open>
                         <summary><h2>Trend Explorer (Smoothed)</h2></summary>
@@ -298,7 +299,7 @@
                     </details>
                 </div>
 
-                <!-- 2. SELECTABLE VISUAL HEATMAP (Monthly vs Yearly Overview) -->
+                <!-- 2. SELECTABLE VISUAL HEATMAP -->
                 <div class="card">
                     <details open>
                         <summary><h2>Visual Heatmap</h2></summary>
@@ -343,7 +344,7 @@
                     <details open>
                         <summary><h2>Habit Impact Split</h2></summary>
                         <div class="collapsible-content">
-                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Compare your outcome metric (e.g. Mood) on days with high vs. low levels of a selected factor.</p>
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Compare your outcome metric on days with high vs. low levels of a selected factor.</p>
                             
                             <div class="corr-controls">
                                 <div>
@@ -456,6 +457,15 @@
             <!-- VIEW 6: Settings -->
             <div id="view-settings" class="view">
                 <div class="card">
+                    <h2>Notifications & Reminders</h2>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0.75rem 0;">
+                        Enable push notifications to receive daily reminders to complete your check-in.
+                    </p>
+                    <button type="button" class="btn-main" onclick="requestNotificationPermission()">Enable Daily Reminders</button>
+                    <button type="button" class="btn-main" onclick="testNotification()" style="background-color: var(--card-bg); color: var(--primary-green); border: 2px solid var(--primary-green); margin-top: 0.5rem;">Test Notification Now</button>
+                </div>
+
+                <div class="card">
                     <h2>Appearance & Accessibility</h2>
                     
                     <div class="slider-group" style="margin-top: 1.25rem;">
@@ -501,11 +511,13 @@
     </div>
 
     <script>
+        // Updated Default Config (Max 5 questions, excluding masturbation, including healthy eating, social activity, and alcohol)
         const DEFAULT_CONFIG = [
             { id: "mood", label: "Overall Mood", color: "#2e8b57", type: "slider", min: 1, max: 10, step: 0.5 },
             { id: "sleep", label: "Hours of Sleep", color: "#4a90e2", type: "slider", min: 0, max: 20, step: 0.5 },
-            { id: "workout", label: "Workout Intensity", color: "#e67e22", type: "slider", min: 1, max: 10, step: 0.5 },
-            { id: "masturbation", label: "Masturbation", color: "#8e44ad", type: "binary" }
+            { id: "healthy_eating", label: "Healthy Eating", color: "#e67e22", type: "slider", min: 1, max: 10, step: 0.5 },
+            { id: "social", label: "Social Activity", color: "#8e44ad", type: "slider", min: 1, max: 10, step: 0.5 },
+            { id: "alcohol", label: "Alcohol Units", color: "#e74c3c", type: "slider", min: 0, max: 10, step: 1 }
         ];
 
         const COLOR_PALETTE = [
@@ -515,6 +527,53 @@
         let selectedColorHex = COLOR_PALETTE[0];
         let isUsingCustomColor = false;
         let currentCalDate = new Date();
+
+        // --- PWA SERVICE WORKER REGISTRATION & NOTIFICATIONS ---
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('Service Worker registered successfully!'))
+                    .catch(err => console.log('Service Worker registration failed:', err));
+            });
+        }
+
+        function requestNotificationPermission() {
+            if (!('Notification' in window)) {
+                alert("This browser does not support notifications.");
+                return;
+            }
+            Notification.requestPermission().then(permission => {
+                if (permission === 'granted') {
+                    alert("Notifications enabled! Daily reminders activated.");
+                } else {
+                    alert("Notification permission denied.");
+                }
+            });
+        }
+
+        function testNotification() {
+            if (!('Notification' in window)) {
+                alert("Notifications not supported.");
+                return;
+            }
+            if (Notification.permission === 'granted') {
+                navigator.serviceWorker.ready.then(registration => {
+                    registration.showNotification("Habit Tracker Reminder", {
+                        body: "Time to log your daily mood, habits, and meals!",
+                        icon: "icon-192.png",
+                        badge: "icon-192.png"
+                    });
+                });
+            } else {
+                Notification.requestPermission().then(permission => {
+                    if (permission === 'granted') {
+                        testNotification();
+                    } else {
+                        alert("Please enable notification permissions first.");
+                    }
+                });
+            }
+        }
 
         function getConfig() {
             let config = JSON.parse(localStorage.getItem('moodTrackerConfig')) || DEFAULT_CONFIG;
@@ -633,7 +692,6 @@
             config.forEach(field => {
                 const rawValues = filteredData.map(e => e[field.id] !== undefined ? e[field.id] : null);
                 
-                // Calculate 7-Day Moving Average to smooth out graph noise
                 const smaValues = rawValues.map((val, idx) => {
                     let sum = 0, count = 0;
                     for (let k = Math.max(0, idx - 6); k <= idx; k++) {
@@ -670,7 +728,7 @@
             });
         }
 
-        // --- 2. SELECTABLE VISUAL HEATMAP (Monthly vs Yearly Overview) ---
+        // --- 2. SELECTABLE VISUAL HEATMAP ---
         function toggleHeatmapHorizon() {
             const mode = document.getElementById('heat-mode').value;
             document.getElementById('heat-month-container').style.display = mode === 'monthly' ? 'block' : 'none';
@@ -744,7 +802,6 @@
                 noMsg.style.display = renderedCount === 0 ? 'block' : 'none';
 
             } else {
-                // Yearly Overview Mode
                 const selectedYear = parseInt(document.getElementById('heat-year-picker').value);
                 const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
                 
